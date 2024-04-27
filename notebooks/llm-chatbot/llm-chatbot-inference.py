@@ -5,7 +5,7 @@ from llm_config import SUPPORTED_LLM_MODELS
 from pathlib import Path
 
 core = ov.Core()
-device = "CPU"
+device = "NPU"
 model_to_run = "INT4"
 
 model_languages = list(SUPPORTED_LLM_MODELS)

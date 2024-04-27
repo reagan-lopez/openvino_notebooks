@@ -1,4 +1,5 @@
 torch>=2.1
+numpy
 datasets
 accelerate
 openvino-nightly
