@@ -1,6 +1,7 @@
-# Create llama-2-chat-7b Chatbot using OpenVINO
+# Create LLM Chatbot using OpenVINO
 In Windows command prompt:
-- Run `.\setup.bat`
-- Run `python llm-chatbot-prepare` for preparing the models. Do this just once.
-- Run `python llm-chatbot-inference` for inferencing.
-  If you did not run the prepare step, at lease make sure to copy `llm_config.py` from `../../utils`
+- Follow the installation instructions at `https://github.com/openvinotoolkit/openvino_notebooks/wiki/Windows`
+- Navigate to this directory: `cd notebooks\llm-chatbot`
+- Install the required packages: `python -m pip install -r requirements.txt`
+- Prepare the models: `python llm-chatbot-prepare.py --model_idx 2 --precisions INT4,INT8`
+- Run the chat app: `python llm-chatbot-inference.py --model_idx 2 --precision INT4 --device GPU`

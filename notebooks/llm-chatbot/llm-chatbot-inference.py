@@ -3,15 +3,38 @@ from transformers import AutoConfig, AutoTokenizer
 from optimum.intel.openvino import OVModelForCausalLM
 from llm_config import SUPPORTED_LLM_MODELS
 from pathlib import Path
+import torch
+from threading import Event, Thread
+from uuid import uuid4
+from typing import List, Tuple
+import gradio as gr
+from transformers import (
+    AutoTokenizer,
+    StoppingCriteria,
+    StoppingCriteriaList,
+    TextIteratorStreamer,
+)
+import argparse
+
+parser = argparse.ArgumentParser(description="OpenVINO Chatbot")
+parser.add_argument("--model_idx", type=int, default=2, help="Index of the model to use from SUPPORTED_LLM_MODELS")
+parser.add_argument("--precision", default="INT4", help="Model precision (INT4, INT8, FP16)")
+parser.add_argument("--device", default="GPU", help="Device (CPU, GPU, NPU)")
+args = parser.parse_args()
+
+model_idx = args.model_idx
+precision = args.precision
+device = args.device
+
+print(f"model_idx = {model_idx}")
+print(f"precision = {precision}")
+print(f"device = {device}")
 
 core = ov.Core()
-device = "NPU"
-model_to_run = "INT4"
-
 model_languages = list(SUPPORTED_LLM_MODELS)
 model_language = model_languages[0]
 model_ids = list(SUPPORTED_LLM_MODELS[model_language])
-model_id = model_ids[5]
+model_id = model_ids[model_idx]
 print(f"Selected model {model_id}")
 model_configuration = SUPPORTED_LLM_MODELS[model_language][model_id]
 
@@ -19,9 +42,9 @@ fp16_model_dir = Path(model_id) / "FP16"
 int8_model_dir = Path(model_id) / "INT8_compressed_weights"
 int4_model_dir = Path(model_id) / "INT4_compressed_weights"
 
-if model_to_run == "INT4":
+if precision == "INT4":
     model_dir = int4_model_dir
-elif model_to_run == "INT8":
+elif precision == "INT8":
     model_dir = int8_model_dir
 else:
     model_dir = fp16_model_dir
@@ -45,18 +68,6 @@ test_string = "2 + 2 ="
 input_tokens = tok(test_string, return_tensors="pt", **tokenizer_kwargs)
 answer = ov_model.generate(**input_tokens, max_new_tokens=2)
 print(tok.batch_decode(answer, skip_special_tokens=True)[0])
-
-import torch
-from threading import Event, Thread
-from uuid import uuid4
-from typing import List, Tuple
-import gradio as gr
-from transformers import (
-    AutoTokenizer,
-    StoppingCriteria,
-    StoppingCriteriaList,
-    TextIteratorStreamer,
-)
 
 model_name = model_configuration["model_id"]
 start_message = model_configuration["start_message"]
@@ -365,7 +376,7 @@ with gr.Blocks(
     clear.click(lambda: None, None, chatbot, queue=False)
 
 # if you are launching remotely, specify server_name and server_port
-#  demo.launch(server_name='your server name', server_port='server port in int')
+# demo.launch(server_name='your server name', server_port='server port in int')
 # if you have any issue to launch on your platform, you can pass share=True to launch method:
 # demo.launch(share=True)
 # it creates a publicly shareable link for the interface. Read more in the docs: https://gradio.app/docs/
