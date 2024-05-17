@@ -15,6 +15,7 @@ from transformers import (
     TextIteratorStreamer,
 )
 import argparse
+import time
 
 parser = argparse.ArgumentParser(description="OpenVINO Chatbot")
 parser.add_argument("--model_idx", type=int, default=2, help="Index of the model to use from SUPPORTED_LLM_MODELS")
@@ -34,13 +35,13 @@ core = ov.Core()
 model_languages = list(SUPPORTED_LLM_MODELS)
 model_language = model_languages[0]
 model_ids = list(SUPPORTED_LLM_MODELS[model_language])
-model_id = model_ids[model_idx]
-print(f"Selected model {model_id}")
-model_configuration = SUPPORTED_LLM_MODELS[model_language][model_id]
+model = model_ids[model_idx]
+print(f"model = {model}")
+model_configuration = SUPPORTED_LLM_MODELS[model_language][model]
 
-fp16_model_dir = Path(model_id) / "FP16"
-int8_model_dir = Path(model_id) / "INT8_compressed_weights"
-int4_model_dir = Path(model_id) / "INT4_compressed_weights"
+fp16_model_dir = Path(model) / "FP16"
+int8_model_dir = Path(model) / "INT8_compressed_weights"
+int4_model_dir = Path(model) / "INT4_compressed_weights"
 
 if precision == "INT4":
     model_dir = int4_model_dir
@@ -67,7 +68,7 @@ tokenizer_kwargs = model_configuration.get("tokenizer_kwargs", {})
 test_string = "2 + 2 ="
 input_tokens = tok(test_string, return_tensors="pt", **tokenizer_kwargs)
 answer = ov_model.generate(**input_tokens, max_new_tokens=2)
-print(tok.batch_decode(answer, skip_special_tokens=True)[0])
+#print(tok.batch_decode(answer, skip_special_tokens=True)[0])
 
 model_name = model_configuration["model_id"]
 start_message = model_configuration["start_message"]
@@ -130,7 +131,7 @@ def convert_history_to_token(history: List[Tuple[str, str]]):
     Returns:
       history in token format
     """
-    pt_model_name = model_id.split("-")[0]
+    pt_model_name = model_name.split("-")[0]
     if pt_model_name == "baichuan2":
         system_tokens = tok.encode(start_message)
         history_tokens = []
@@ -233,6 +234,7 @@ def bot(history, temperature, top_p, top_k, repetition_penalty, conversation_id)
         genration function for single thread
         """
         global start_time
+        start_time = time.time()  # Record the start time
         ov_model.generate(**generate_kwargs)
         stream_complete.set()
 
@@ -241,10 +243,28 @@ def bot(history, temperature, top_p, top_k, repetition_penalty, conversation_id)
 
     # Initialize an empty string to store the generated text
     partial_text = ""
+    first_token_time = None
     for new_text in streamer:
+        if not first_token_time:
+            first_token_time = time.time()  # Record the time of the first token
         partial_text = text_processor(partial_text, new_text)
         history[-1][1] = partial_text
         yield history
+
+    end_time = time.time()  # Record the end time
+    total_time = end_time - start_time
+
+    print(f"\nPrompt:\n{history[-1][0]}")
+    print(f"\nResponse:\n{partial_text}")
+    tokens = tok.encode(partial_text, add_special_tokens=False)
+    #print(f"tokens:{tokens}")
+    tokens_per_second = len(tokens) / total_time
+    time_to_first_token = first_token_time - start_time
+
+    print(f"\nTokens per Second: {tokens_per_second:.2f}")
+    print(f"Time To First Token: {time_to_first_token:.2f} seconds")
+    #print(f"first_token_time: {first_token_time:.2f} seconds")
+    #print(f"start_time: {start_time:.2f} seconds")
 
 
 def request_cancel():
@@ -263,7 +283,7 @@ with gr.Blocks(
     css=".disclaimer {font-variant-caps: all-small-caps;}",
 ) as demo:
     conversation_id = gr.State(get_uuid)
-    gr.Markdown(f"""<h1><center>OpenVINO {model_id} Chatbot</center></h1>""")
+    gr.Markdown(f"""<h1><center>OpenVINO {model} Chatbot</center></h1>""")
     chatbot = gr.Chatbot(height=500)
     with gr.Row():
         with gr.Column():
